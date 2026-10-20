@@ -111,9 +111,22 @@ class StoreActivity : ScreenActivity() {
         content.addView(list, lp())
     }
 
+    // Turns "Lädt …" into "Öffnen" as soon as Google Play has finished installing.
+    private val installed = object : android.content.BroadcastReceiver() {
+        override fun onReceive(c: Context, i: Intent) { render() }
+    }
+
     override fun onResume() {
         super.onResume()
         render()
+        val f = android.content.IntentFilter(Intent.ACTION_PACKAGE_ADDED).apply { addDataScheme("package") }
+        if (android.os.Build.VERSION.SDK_INT >= 33) registerReceiver(installed, f, Context.RECEIVER_NOT_EXPORTED)
+        else registerReceiver(installed, f)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        runCatching { unregisterReceiver(installed) }
     }
 
     private fun matches(app: StoreApp): Boolean {
@@ -182,8 +195,14 @@ class StoreActivity : ScreenActivity() {
         texts.addView(text(app.info, 13f, pal.sub).apply { setPadding(0, dp(3), 0, 0) })
         r.addView(texts, LinearLayout.LayoutParams(0, -2, 1f))
 
-        r.addView(pill(if (installed) "Öffnen" else "Laden", pal, primary = !installed) {
-            if (installed) Apps.launch(this, app.pkg) else Apps.openPlayStore(this, app)
+        if (installed) Installer.finished(app.pkg)
+        val busy = !installed && Installer.isLoading(app.pkg)
+        r.addView(pill(when { installed -> "Öffnen"; busy -> "Lädt …"; else -> "Laden" }, pal, primary = !installed && !busy) {
+            when {
+                installed -> Apps.launch(this, app.pkg)
+                busy -> {}
+                else -> { Installer.install(this, app); render() }
+            }
         }, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(10) })
 
         if (installed) {

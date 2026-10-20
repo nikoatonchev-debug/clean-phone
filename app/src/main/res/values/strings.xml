@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="guard_description">Clean schickt dich zur Startseite zurück, wenn eine App aufgeht, die nicht zu Clean gehört. Clean liest dabei keine Inhalte, nur welche App gerade geöffnet wird.</string>
+    <string name="guard_description">Clean schickt dich zur Startseite zurück, wenn eine App aufgeht, die nicht zu Clean gehört. Wenn du im Clean App Store auf „Laden“ tippst, tippt Clean im Play Store für dich auf „Installieren“. Andere Inhalte liest oder speichert Clean nicht.</string>
 </resources>

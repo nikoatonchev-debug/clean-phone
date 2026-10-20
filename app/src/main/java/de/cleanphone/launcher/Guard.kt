@@ -117,13 +117,17 @@ class NotifyFilter : NotificationListenerService() {
     }
 }
 
-/** Sends you back to Clean when an app that is not part of Clean opens. */
+/**
+ * Sends you back to Clean when an app that is not part of Clean opens, and taps
+ * "Installieren" in Google Play for apps chosen in Clean's App Store.
+ */
 class AppGuard : AccessibilityService() {
     private var lastToast = 0L
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
-        if (e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = e.packageName?.toString() ?: return
+        if (pkg == "com.android.vending") { Installer.onPlayEvent(this); return }
+        if (e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         if (pkg == packageName || !Guard.blocksApp(this, pkg)) return
         performGlobalAction(GLOBAL_ACTION_HOME)
         val now = System.currentTimeMillis()
