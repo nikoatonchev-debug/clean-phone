@@ -27,6 +27,9 @@ object Installer {
 
     fun hasPlay(c: Context) = Apps.installed(c, PLAY)
 
+    /** Clean only lets Google Play show itself while it is loading an app for you. */
+    fun playAllowed() = pending != null && System.currentTimeMillis() - startedAt < 60_000
+
     fun isLoading(pkg: String): Boolean {
         val t = loading[pkg] ?: return false
         if (System.currentTimeMillis() - t > 10 * 60_000) { loading.remove(pkg); return false }
@@ -35,7 +38,9 @@ object Installer {
 
     fun finished(pkg: String) { loading.remove(pkg) }
 
-    fun install(c: Context, app: StoreApp) {
+    fun install(c: Context, app: StoreApp) = install(c, app.pkg)
+
+    fun install(c: Context, pkg: String) {
         if (!hasPlay(c)) {
             AlertDialog.Builder(c)
                 .setTitle("Kein Google Play")
@@ -44,25 +49,43 @@ object Installer {
                 .show()
             return
         }
-        loading[app.pkg] = System.currentTimeMillis()
-        if (Guard.appGuardEnabled(c)) {
-            pending = app.pkg; startedAt = System.currentTimeMillis(); done = false
+        // Known to be signed out: explain first instead of flashing the Play Store.
+        if (c.prefs().getBoolean("play_signin_needed", false)) {
+            SignInActivity.open(c, pkg)
+            return
         }
-        val i = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=${app.pkg}"))
+        loading[pkg] = System.currentTimeMillis()
+        if (Guard.appGuardEnabled(c)) {
+            pending = pkg; startedAt = System.currentTimeMillis(); done = false
+        }
+        val i = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$pkg"))
             .setPackage(PLAY)
             // Ask Play for its small sheet on top of Clean instead of the full store.
             .putExtra("overlay", true)
             .putExtra("callerId", c.packageName)
+        if (c !is android.app.Activity) i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         runCatching { c.startActivity(i) }.onFailure {
-            loading.remove(app.pkg)
+            loading.remove(pkg)
             pending = null
+        }
+        // Look at the Play screen a few times per second; Play doesn't always report when it's ready.
+        if (pending != null) main.postDelayed(poll, 500)
+    }
+
+    private val poll = object : Runnable {
+        override fun run() {
+            val svc = AppGuard.instance
+            if (pending == null || done || svc == null) return
+            onPlayEvent(svc)
+            if (pending != null && !done) main.postDelayed(this, 400)
         }
     }
 
     /** Called by [AppGuard] for every screen change inside Google Play. */
     fun onPlayEvent(svc: AccessibilityService) {
-        if (pending == null || done) return
-        if (System.currentTimeMillis() - startedAt > 30_000) { pending = null; return }
+        val pkg = pending ?: return
+        if (done) return
+        if (System.currentTimeMillis() - startedAt > 60_000) { pending = null; return }
         val roots = buildList {
             svc.rootInActiveWindow?.let { add(it) }
             runCatching { svc.windows.mapNotNull { it.root } }.getOrNull()?.let { addAll(it) }
@@ -71,6 +94,7 @@ object Installer {
             val install = find(root, "Installieren", "Install")
             if (install != null) {
                 done = true
+                svc.prefs().edit().putBoolean("play_signin_needed", false).apply()
                 click(install)
                 // Give Play a moment to start the download, then go back to Clean.
                 main.postDelayed({ goBack(svc) }, 900)
@@ -79,13 +103,26 @@ object Installer {
             // Already installed or being installed: nothing to tap, just go back.
             if (find(root, "Öffnen", "Open", "Deinstallieren", "Uninstall", "Abbrechen", "Cancel") != null) {
                 done = true
+                svc.prefs().edit().putBoolean("play_signin_needed", false).apply()
                 main.postDelayed({ goBack(svc) }, 300)
                 return
             }
-            // Not signed in to Google: leave Play open so the user can sign in once.
-            if (find(root, "Anmelden", "Sign in") != null) {
-                pending?.let { loading.remove(it) }
-                pending = null
+            // The download has started (the user tapped "Installieren" themselves): go back to Clean.
+            if (findContaining(root, "Wird installiert", "Wird heruntergeladen", "Ausstehend", "Installing", "Downloading", "Pending") != null) {
+                done = true
+                main.postDelayed({ goBack(svc) }, 300)
+                return
+            }
+            // Not signed in to Google: leave Play and show Clean's short sign-in guide.
+            // (Google hides the sign-in button from other apps, so we recognise the text above it.)
+            if (find(root, "Anmelden", "Sign in") != null ||
+                findContaining(root, "Melde dich an", "Sign in to find") != null
+            ) {
+                done = true
+                loading.remove(pkg)
+                svc.prefs().edit().putBoolean("play_signin_needed", true).apply()
+                goBack(svc)
+                main.postDelayed({ SignInActivity.open(svc, pkg) }, 400)
                 return
             }
         }
@@ -96,15 +133,29 @@ object Installer {
         svc.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
     }
 
+    /** Walks the whole Play screen (the built-in text search misses some buttons). */
     private fun find(root: AccessibilityNodeInfo, vararg labels: String): AccessibilityNodeInfo? {
-        for (label in labels) {
-            val hits = runCatching { root.findAccessibilityNodeInfosByText(label) }.getOrNull() ?: continue
-            hits.firstOrNull { n ->
-                n.isVisibleToUser && n.isEnabled &&
-                    (n.text?.toString()?.trim().equals(label, true) || n.contentDescription?.toString()?.trim().equals(label, true))
-            }?.let { return it }
+        val wanted = labels.map { it.lowercase() }
+        fun visit(n: AccessibilityNodeInfo?, depth: Int): AccessibilityNodeInfo? {
+            if (n == null || depth > 40) return null
+            val t = (n.text ?: n.contentDescription)?.toString()?.trim()?.lowercase()
+            if (t != null && t in wanted && n.isVisibleToUser && n.isEnabled) return n
+            for (i in 0 until n.childCount) visit(n.getChild(i), depth + 1)?.let { return it }
+            return null
         }
-        return null
+        return visit(root, 0)
+    }
+
+    private fun findContaining(root: AccessibilityNodeInfo, vararg parts: String): AccessibilityNodeInfo? {
+        val wanted = parts.map { it.lowercase() }
+        fun visit(n: AccessibilityNodeInfo?, depth: Int): AccessibilityNodeInfo? {
+            if (n == null || depth > 40) return null
+            val t = (n.text ?: n.contentDescription)?.toString()?.lowercase()
+            if (t != null && wanted.any { t.contains(it) } && n.isVisibleToUser) return n
+            for (i in 0 until n.childCount) visit(n.getChild(i), depth + 1)?.let { return it }
+            return null
+        }
+        return visit(root, 0)
     }
 
     private fun click(node: AccessibilityNodeInfo) {

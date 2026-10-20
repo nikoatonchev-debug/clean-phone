@@ -52,6 +52,9 @@ object Guard {
         return pkg !in allowedCache
     }
 
+    /** The Play Store only works in the background for Clean, it never opens on its own. */
+    fun blocksPlay(c: Context) = c.prefs().getBoolean("guard_on", true)
+
     /** True when the app [pkg] must not be opened. */
     fun blocksApp(c: Context, pkg: String): Boolean {
         if (!c.prefs().getBoolean("guard_on", true)) return false
@@ -124,11 +127,31 @@ class NotifyFilter : NotificationListenerService() {
 class AppGuard : AccessibilityService() {
     private var lastToast = 0L
 
+    override fun onServiceConnected() { instance = this }
+
+    override fun onDestroy() {
+        if (instance === this) instance = null
+        super.onDestroy()
+    }
+
+    companion object {
+        /** The running service, so the installer can look at Google Play on its own schedule. */
+        @Volatile var instance: AppGuard? = null
+    }
+
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
         val pkg = e.packageName?.toString() ?: return
-        if (pkg == "com.android.vending") { Installer.onPlayEvent(this); return }
+        if (pkg == "com.android.vending") {
+            if (Installer.playAllowed()) Installer.onPlayEvent(this)
+            else if (e.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && Guard.blocksPlay(this)) sendHome()
+            return
+        }
         if (e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         if (pkg == packageName || !Guard.blocksApp(this, pkg)) return
+        sendHome()
+    }
+
+    private fun sendHome() {
         performGlobalAction(GLOBAL_ACTION_HOME)
         val now = System.currentTimeMillis()
         if (now - lastToast > 3000) {

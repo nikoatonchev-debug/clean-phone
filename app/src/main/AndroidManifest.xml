@@ -49,6 +49,11 @@
             android:exported="false"
             android:screenOrientation="portrait"
             tools:ignore="DiscouragedApi,LockedOrientationActivity" />
+        <activity
+            android:name=".SignInActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            tools:ignore="DiscouragedApi,LockedOrientationActivity" />
         <activity android:name=".StepsActivity" android:exported="false" />
         <activity android:name=".WeatherActivity" android:exported="false" />
         <activity android:name=".StoreActivity" android:exported="false" />
