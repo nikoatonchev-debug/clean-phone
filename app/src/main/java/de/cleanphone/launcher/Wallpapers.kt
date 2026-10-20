@@ -26,17 +26,17 @@ import android.widget.LinearLayout
 import android.widget.Toast
 import kotlin.concurrent.thread
 
-/** Built-in flat backgrounds. "Nacht" is the one every phone starts with. */
+/** Built-in flat backgrounds. "Weiß" is the one every phone starts with. */
 data class Preset(val name: String, val dark: Boolean, val bg: String, val a: String, val b: String, val cc: String)
 
 object Wallpapers {
     val presets = listOf(
-        Preset("Nacht", true, "#0B1220", "#1B2A4A", "#14213D", "#25365E"),
-        Preset("Graphit", true, "#141414", "#232323", "#1C1C1C", "#2F2F2E"),
-        Preset("Wald", true, "#06231C", "#0F3D30", "#0A2F25", "#145A45"),
-        Preset("Glut", true, "#22100A", "#4A1B0C", "#361409", "#712B13"),
-        Preset("Lila", true, "#120F30", "#26215C", "#1C1846", "#3C3489"),
-        Preset("Sand", false, "#F1EFE8", "#E4E1D6", "#E9E6DD", "#D3D1C7"),
+        Preset("Weiß", false, "#FBFBFA", "#F3F3F1", "#F6F6F4", "#EFEFEC"),
+        Preset("Nebel", false, "#F2F5F9", "#E6ECF4", "#ECF0F6", "#DDE5F0"),
+        Preset("Salbei", false, "#F2F5F1", "#E5ECE3", "#EBF0E9", "#DAE4D7"),
+        Preset("Sand", false, "#F7F4EE", "#EEE8DD", "#F2EEE6", "#E6DECF"),
+        Preset("Nacht", true, "#0B0B0C", "#161618", "#121214", "#1E1E21"),
+        Preset("Tiefblau", true, "#0B1220", "#1B2A4A", "#14213D", "#25365E"),
     )
 
     /** Same three soft circles as the preview, scaled to any screen. */
@@ -107,7 +107,7 @@ class WallpaperActivity : ScreenActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val current = prefs().getString("wallpaper", "Nacht")
+        val current = prefs().getString("wallpaper", "Weiß")
         val grid = GridLayout(this).apply { columnCount = 3 }
         val cellW = (resources.displayMetrics.widthPixels - dp(40) - dp(24)) / 3
         val cellH = (cellW * 1.9f).toInt()
@@ -117,7 +117,7 @@ class WallpaperActivity : ScreenActivity() {
                 gravity = Gravity.CENTER_HORIZONTAL
             }
             val frame = FrameLayout(this).apply {
-                background = roundRect(Color.TRANSPARENT, dp(16).toFloat(), if (p.name == current) dp(3) else 0, pal.text)
+                background = roundRect(Color.TRANSPARENT, dp(18).toFloat(), if (p.name == current) dp(2) else dp(1), if (p.name == current) pal.text else pal.line)
                 setPadding(dp(4), dp(4), dp(4), dp(4))
             }
             val img = ImageView(this).apply {
@@ -138,7 +138,7 @@ class WallpaperActivity : ScreenActivity() {
                 }
             }
             cell.addView(frame, LinearLayout.LayoutParams(cellW, cellH))
-            cell.addView(text(if (p.name == "Nacht") "Nacht (Standard)" else p.name, 13f, pal.sub).apply {
+            cell.addView(text(if (p.name == "Weiß") "Weiß (Standard)" else p.name, 13f, pal.sub).apply {
                 setPadding(0, dp(6), 0, dp(14))
             })
             grid.addView(cell, GridLayout.LayoutParams().apply {
@@ -146,7 +146,8 @@ class WallpaperActivity : ScreenActivity() {
             })
         }
         content.addView(grid, lp())
-        row("Eigenes Foto wählen", Glyph.PHOTO) {
+        section("Eigenes Bild")
+        row("Foto aus der Galerie", Glyph.PHOTO) {
             val pick = if (Build.VERSION.SDK_INT >= 33) Intent(MediaStore.ACTION_PICK_IMAGES)
             else Intent(Intent.ACTION_GET_CONTENT).setType("image/*")
             runCatching { startActivityForResult(pick, 7) }.onFailure {

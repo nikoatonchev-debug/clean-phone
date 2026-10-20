@@ -1,24 +1,22 @@
 package de.cleanphone.launcher
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.app.role.RoleManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Color
-import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
-import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
 import android.widget.GridLayout
 import android.widget.ImageView
@@ -26,6 +24,8 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextClock
 import android.widget.TextView
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
 
@@ -63,16 +63,17 @@ class HomeActivity : Activity() {
     private lateinit var stepsText: TextView
     private lateinit var weatherText: TextView
     private lateinit var weatherIcon: ImageView
-    private lateinit var banner: TextView
+    private lateinit var setupHint: TextView
     private lateinit var dateText: TextView
-    private val dateFormat = java.text.SimpleDateFormat("EEEE, d. MMMM", Locale.GERMANY)
-    private val tick = object : android.content.BroadcastReceiver() {
-        override fun onReceive(c: Context, i: Intent) { dateText.text = dateFormat.format(java.util.Date()) }
-    }
     private var torchOn = false
     private var torchId: String? = null
     private var builtDark: Boolean? = null
+    private var animateIn = true
 
+    private val dateFormat = SimpleDateFormat("EEEE, d. MMMM", Locale.GERMANY)
+    private val tick = object : BroadcastReceiver() {
+        override fun onReceive(c: Context, i: Intent) { dateText.text = dateFormat.format(Date()) }
+    }
     private val torchCallback = object : CameraManager.TorchCallback() {
         override fun onTorchModeChanged(id: String, enabled: Boolean) {
             if (id == torchId) { torchOn = enabled; buildDock() }
@@ -81,7 +82,11 @@ class HomeActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        firstRun()
+        if (!prefs().getBoolean("first_done", false)) {
+            prefs().edit().putBoolean("first_done", true).apply()
+            Wallpapers.apply(this, Wallpapers.presets.first())
+            startActivity(Intent(this, WelcomeActivity::class.java))
+        }
         build()
         val cm = getSystemService(CameraManager::class.java)
         torchId = runCatching {
@@ -95,23 +100,15 @@ class HomeActivity : Activity() {
         super.onDestroy()
     }
 
-    private fun firstRun() {
-        val p = prefs()
-        if (p.getBoolean("first_done", false)) return
-        p.edit().putBoolean("first_done", true).apply()
-        Wallpapers.apply(this, Wallpapers.presets.first()) { recreate() }
-        val ask = mutableListOf(Manifest.permission.ACCESS_COARSE_LOCATION)
-        if (Build.VERSION.SDK_INT >= 29) ask += Manifest.permission.ACTIVITY_RECOGNITION
-        requestPermissions(ask.toTypedArray(), 1)
-    }
-
-    override fun onRequestPermissionsResult(code: Int, perms: Array<out String>, res: IntArray) {
-        refreshInfo(force = true)
-    }
+    /** White glass in light mode, smoked glass in dark mode. */
+    private fun tileBg(radius: Int) =
+        roundRect(if (pal.dark) 0x1FFFFFFF else 0xF2FFFFFF.toInt(), dp(radius).toFloat(), 1,
+            if (pal.dark) 0x1AFFFFFF else 0x0F000000)
 
     private fun build() {
         pal = Palette.of(this)
         builtDark = pal.dark
+        animateIn = true
         val fg = pal.text
         @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
@@ -121,97 +118,108 @@ class HomeActivity : Activity() {
         val root = SwipeFrame(this) { openQuickSettings() }
         val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         root.addView(col, FrameLayout.LayoutParams(-1, -1))
-        root.setOnApplyWindowInsetsListener { v, insets ->
+        root.setOnApplyWindowInsetsListener { _, insets ->
             @Suppress("DEPRECATION")
             col.setPadding(0, insets.systemWindowInsetTop, 0, insets.systemWindowInsetBottom)
             insets
         }
 
-        // Clock, date and the small info line.
+        // Clock, date and two small info chips - left aligned, lots of air.
         val head = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(24), dp(36), dp(24), dp(28))
+            setPadding(dp(30), dp(44), dp(30), dp(30))
         }
         head.addView(TextClock(this).apply {
             format12Hour = "HH:mm"; format24Hour = "HH:mm"
-            textSize = 76f
+            textSize = 84f
             setTextColor(fg)
-            typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
-            gravity = Gravity.CENTER
-            shadow(this)
+            typeface = Fonts.get(this@HomeActivity, 200)
+            letterSpacing = -0.04f
+            includeFontPadding = false
         })
-        dateText = text("", 16f, fg).apply { gravity = Gravity.CENTER; shadow(this) }
+        dateText = text("", 18f, fg, weight = 500).apply { setPadding(dp(4), dp(6), 0, 0) }
         head.addView(dateText)
-        val info = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            setPadding(0, dp(14), 0, 0)
-        }
-        info.addView(ImageView(this).apply { setImageDrawable(GlyphIcon(Glyph.STEPS, fg, tile = false)) },
-            LinearLayout.LayoutParams(dp(16), dp(16)).apply { rightMargin = dp(6) })
-        stepsText = text("–", 14f, fg).also { shadow(it) }
-        info.addView(stepsText)
-        info.addView(text("     ", 14f, fg))
-        weatherIcon = ImageView(this)
-        info.addView(weatherIcon, LinearLayout.LayoutParams(dp(18), dp(18)).apply { rightMargin = dp(6) })
-        weatherText = text("", 14f, fg).also { shadow(it) }
-        info.addView(weatherText)
-        stepsText.setOnClickListener { open(StepsActivity::class.java) }
-        weatherText.setOnClickListener { open(WeatherActivity::class.java) }
-        weatherIcon.setOnClickListener { open(WeatherActivity::class.java) }
-        head.addView(info)
-        col.addView(head, lp())
 
-        banner = text("Als Startbildschirm festlegen", 14f, Color.WHITE, bold = true).apply {
-            gravity = Gravity.CENTER
-            setPadding(dp(16), dp(10), dp(16), dp(10))
-            background = pressable(roundRect(Glyph.STORE.tileColor, dp(20).toFloat()), true)
-            setOnClickListener { askDefaultHome() }
+        val chips = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, dp(20), 0, 0)
         }
-        col.addView(banner, LinearLayout.LayoutParams(-2, -2).apply {
-            gravity = Gravity.CENTER_HORIZONTAL; bottomMargin = dp(16)
+        fun chip(glyphView: ImageView, label: TextView, onClick: () -> Unit) = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(12), dp(8), dp(14), dp(8))
+            background = tileBg(18)
+            addView(glyphView, LinearLayout.LayoutParams(dp(16), dp(16)).apply { rightMargin = dp(7) })
+            addView(label)
+            softPress()
+            setOnClickListener { onClick() }
+        }
+        stepsText = text("–", 14f, fg, weight = 500)
+        chips.addView(chip(ImageView(this).apply { setImageDrawable(GlyphIcon(Glyph.STEPS, fg, tile = false)) }, stepsText) {
+            open(StepsActivity::class.java)
         })
+        weatherIcon = ImageView(this)
+        weatherText = text("Wetter", 14f, fg, weight = 500)
+        chips.addView(chip(weatherIcon, weatherText) { open(WeatherActivity::class.java) },
+            LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(8) })
+        head.addView(chips)
+
+        setupHint = text("Einrichtung abschließen  ›", 14f, pal.onPrimary, weight = 600).apply {
+            setPadding(dp(16), dp(9), dp(16), dp(9))
+            background = roundRect(pal.primary, dp(18).toFloat())
+            softPress()
+            setOnClickListener {
+                startActivity(Intent(this@HomeActivity, WelcomeActivity::class.java).putExtra("setup", true))
+            }
+        }
+        head.addView(setupHint, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(16) })
+        col.addView(head, lp())
 
         grid = GridLayout(this).apply { columnCount = 4 }
         val scroll = ScrollView(this).apply {
             isVerticalScrollBarEnabled = false
             overScrollMode = View.OVER_SCROLL_NEVER
+            clipToPadding = false
+            setPadding(0, dp(4), 0, dp(4))
             addView(grid, FrameLayout.LayoutParams(-1, -2))
         }
         col.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f).apply {
-            leftMargin = dp(20); rightMargin = dp(20)
+            leftMargin = dp(18); rightMargin = dp(18)
         })
 
         dock = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            setPadding(dp(8), dp(10), dp(8), dp(10))
-            background = roundRect(if (pal.dark) 0x26FFFFFF else 0x40FFFFFF, dp(28).toFloat())
+            setPadding(dp(10), dp(10), dp(10), dp(10))
+            background = tileBg(32)
+            elevation = dp(2).toFloat()
         }
-        col.addView(dock, lp().apply { setMargins(dp(20), dp(8), dp(20), dp(16)) })
+        col.addView(dock, lp().apply { setMargins(dp(22), dp(8), dp(22), dp(18)) })
         setContentView(root)
-    }
-
-    private fun shadow(t: TextView) {
-        t.setShadowLayer(dp(6).toFloat(), 0f, dp(1).toFloat(), if (pal.dark) 0x66000000 else 0x33FFFFFF)
     }
 
     override fun onResume() {
         super.onResume()
-        if (builtDark != Palette.of(this).dark) build()
+        if (builtDark != Palette.of(this).dark) { build(); dirty = true }
+        Guard.enableSilently(this)
         Lockdown.apply(this)
-        buildGrid()
-        buildDock()
-        banner.visibility = if (isDefaultHome() || Lockdown.isOwner(this)) View.GONE else View.VISIBLE
+        // The grid is only rebuilt when apps or the look changed, so coming home stays instant.
+        if (dirty || grid.childCount == 0) {
+            dirty = false
+            Guard.invalidate()
+            buildGrid()
+            buildDock()
+        }
+        setupHint.visibility = if (WelcomeActivity.setupComplete(this)) View.GONE else View.VISIBLE
         refreshInfo(force = false)
-        dateText.text = dateFormat.format(java.util.Date())
-        registerReceiver(tick, android.content.IntentFilter(Intent.ACTION_TIME_TICK))
+        dateText.text = dateFormat.format(Date())
+        registerReceiver(tick, IntentFilter(Intent.ACTION_TIME_TICK))
     }
 
     override fun onPause() {
         super.onPause()
         runCatching { unregisterReceiver(tick) }
+        animateIn = false
     }
 
     @Deprecated("Deprecated in Java")
@@ -219,21 +227,17 @@ class HomeActivity : Activity() {
 
     // ---------------------------------------------------------------- tiles
 
-    private class Tile(val icon: Drawable, val label: String, val onClick: () -> Unit)
+    private class Tile(val icon: Drawable, val label: String, val isGlyph: Boolean, val onClick: () -> Unit)
 
     private fun appTile(pkg: String?): Tile? {
         if (pkg == null || !Apps.launchable(this, pkg)) return null
         val icon = Apps.icon(this, pkg, prefs().getBoolean("mono", false)) ?: return null
-        return Tile(icon, Apps.label(this, pkg)) { Apps.launch(this, pkg) }
+        return Tile(icon, Apps.label(this, pkg), false) { Apps.launch(this, pkg) }
     }
 
-    private fun glyphTile(g: Glyph, label: String, onClick: () -> Unit): Tile {
-        val mono = prefs().getBoolean("mono", false)
-        return Tile(adaptive(if (mono) Color.parseColor("#3A3A38") else g.tileColor, g), label, onClick)
-    }
-
-    /** Our own icons get the phone's icon shape (squircle on Samsung), just like real app logos. */
-    private fun adaptive(color: Int, g: Glyph): Drawable = GlyphIcon(g, tileColor = color, systemShape = true)
+    /** Clean's own apps are drawn as simple line icons, so they feel like part of the system. */
+    private fun glyphTile(g: Glyph, label: String, onClick: () -> Unit) =
+        Tile(GlyphIcon(g, pal.text, tile = false), label, true, onClick)
 
     private fun tiles(): List<Tile> {
         val core = listOf("com.whatsapp", "com.spotify.music", "com.google.android.apps.maps")
@@ -244,7 +248,7 @@ class HomeActivity : Activity() {
             appTile(Apps.gallery(this)),
             appTile("com.google.android.apps.maps"),
             appTile(Apps.clock(this)),
-            glyphTile(Glyph.WEATHER, "Wetter") { open(WeatherActivity::class.java) },
+            glyphTile(Glyph.SUN, "Wetter") { open(WeatherActivity::class.java) },
             glyphTile(Glyph.STEPS, "Schritte") { open(StepsActivity::class.java) },
             glyphTile(Glyph.QR, "QR-Scanner") { open(ScanActivity::class.java) },
             appTile(Apps.calculator(this)),
@@ -257,43 +261,61 @@ class HomeActivity : Activity() {
         return list.filterNotNull().distinctBy { it.label }
     }
 
-    private fun tileView(t: Tile, size: Int): View = ImageView(this).apply {
-        setImageDrawable(t.icon)
-        contentDescription = t.label
-        background = pressable(null, pal.dark)
-        setOnClickListener { t.onClick() }
-        setPadding(dp(2), dp(2), dp(2), dp(2))
-        layoutParams = LinearLayout.LayoutParams(size, size)
+    private fun tileView(t: Tile, box: Int, framed: Boolean): View {
+        val frame = FrameLayout(this).apply {
+            if (framed) {
+                background = tileBg(22)
+                elevation = dp(1).toFloat()
+            }
+            contentDescription = t.label
+            softPress(0.9f)
+            setOnClickListener { t.onClick() }
+        }
+        val inner = when {
+            t.isGlyph -> (box * 0.42f).toInt()
+            framed -> (box * 0.7f).toInt()
+            else -> (box * 0.86f).toInt()
+        }
+        frame.addView(ImageView(this).apply { setImageDrawable(t.icon) },
+            FrameLayout.LayoutParams(inner, inner, Gravity.CENTER))
+        return frame
     }
 
     private fun buildGrid() {
         grid.removeAllViews()
-        val cell = (resources.displayMetrics.widthPixels - dp(40)) / 4
-        val icon = minOf(dp(60), cell - dp(16))
-        for (t in tiles()) {
-            val holder = FrameLayout(this)
-            holder.addView(tileView(t, icon), FrameLayout.LayoutParams(icon, icon, Gravity.CENTER))
-            grid.addView(holder, GridLayout.LayoutParams().apply {
-                width = cell; height = icon + dp(26)
-            })
+        val cell = (resources.displayMetrics.widthPixels - dp(36)) / 4
+        val box = minOf(dp(66), cell - dp(14))
+        tiles().forEachIndexed { i, t ->
+            val holder = FrameLayout(this).apply { clipChildren = false; clipToPadding = false }
+            val v = tileView(t, box, framed = true)
+            holder.addView(v, FrameLayout.LayoutParams(box, box, Gravity.CENTER))
+            grid.addView(holder, GridLayout.LayoutParams().apply { width = cell; height = box + dp(20) })
+            if (animateIn) {
+                v.alpha = 0f; v.translationY = dp(14).toFloat()
+                v.animate().alpha(1f).translationY(0f).setStartDelay(40L + i * 22L).setDuration(380)
+                    .setInterpolator(DecelerateInterpolator(2f)).start()
+            }
         }
+        animateIn = false
     }
 
     private fun buildDock() {
         if (!::dock.isInitialized) return
         dock.removeAllViews()
-        val size = dp(54)
+        val size = dp(52)
         val items = listOfNotNull(
             appTile(Apps.dialer(this)),
             appTile(Apps.sms(this)),
             appTile(Apps.contacts(this)),
             if (torchId != null) Tile(
-                adaptive(if (torchOn) Color.parseColor("#EF9F27") else Glyph.TORCH.tileColor, Glyph.TORCH),
-                "Taschenlampe"
+                GlyphIcon(Glyph.TORCH, if (torchOn) Color.parseColor("#F5A524") else pal.text, tile = false),
+                "Taschenlampe", true
             ) { toggleTorch() } else null
         )
         for (t in items) {
-            dock.addView(tileView(t, size), LinearLayout.LayoutParams(0, size, 1f))
+            val holder = FrameLayout(this)
+            holder.addView(tileView(t, size, framed = false), FrameLayout.LayoutParams(size, size, Gravity.CENTER))
+            dock.addView(holder, LinearLayout.LayoutParams(0, size, 1f))
         }
     }
 
@@ -305,16 +327,20 @@ class HomeActivity : Activity() {
     // ---------------------------------------------------------------- info
 
     private fun refreshInfo(force: Boolean) {
-        stepsText.text = "%,d Schritte".format(Locale.GERMANY, StepTracker.today(this))
-        StepTracker.read(this) { steps -> stepsText.text = "%,d Schritte".format(Locale.GERMANY, steps) }
+        stepsText.text = "%,d".format(Locale.GERMANY, StepTracker.today(this))
+        StepTracker.read(this) { steps -> stepsText.text = "%,d".format(Locale.GERMANY, steps) }
         showWeather()
         if (force || Weather.stale(this)) Weather.refresh(this) { showWeather() }
     }
 
     private fun showWeather() {
         val t = Weather.currentTemp(this)
-        weatherText.text = t?.let { "$it ${Weather.describe(Weather.currentCode(this))}" } ?: "Wetter"
+        weatherText.text = t?.let { "$it  ${Weather.describe(Weather.currentCode(this))}" } ?: "Wetter"
         weatherIcon.setImageDrawable(GlyphIcon(Weather.glyph(Weather.currentCode(this)), pal.text, tile = false))
+    }
+
+    override fun onRequestPermissionsResult(code: Int, perms: Array<out String>, res: IntArray) {
+        refreshInfo(force = true)
     }
 
     // ---------------------------------------------------------------- system
@@ -323,27 +349,19 @@ class HomeActivity : Activity() {
 
     @SuppressLint("WrongConstant")
     private fun openQuickSettings() {
-        android.util.Log.i("Clean", "pull down")
         runCatching {
             val sb = getSystemService("statusbar")
             Class.forName("android.app.StatusBarManager").getMethod("expandSettingsPanel").invoke(sb)
-        }.onFailure { android.util.Log.w("Clean", "quick settings", it) }
-    }
-
-    private fun isDefaultHome(): Boolean {
-        val i = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-        return packageManager.resolveActivity(i, PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName == packageName
-    }
-
-    private fun askDefaultHome() {
-        if (Build.VERSION.SDK_INT >= 29) {
-            val rm = getSystemService(RoleManager::class.java)
-            if (rm.isRoleAvailable(RoleManager.ROLE_HOME) && !rm.isRoleHeld(RoleManager.ROLE_HOME)) {
-                @Suppress("DEPRECATION")
-                startActivityForResult(rm.createRequestRoleIntent(RoleManager.ROLE_HOME), 2)
-                return
-            }
         }
-        Apps.openSystem(this, Intent(Settings.ACTION_HOME_SETTINGS))
+    }
+
+    companion object {
+        /** Set when apps are installed/removed or the look changes. */
+        @Volatile var dirty = true
+
+        fun isDefaultHome(c: Context): Boolean {
+            val i = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+            return c.packageManager.resolveActivity(i, PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName == c.packageName
+        }
     }
 }

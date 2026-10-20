@@ -19,7 +19,7 @@ enum class Glyph(val tileColor: Int) {
     SUN(0), CLOUD(0), RAIN(0), SNOW(0), STORM(0), FOG(0),
     BACK(0), CLOSE(0), CHEVRON(0), LOCK(0), BLOCK(0), PHOTO(0), MOON(0), GRID(0),
     WIFI(0), BLUETOOTH(0), BATTERY(0), BELL(0), DISPLAY(0), HOURGLASS(0),
-    CONTRAST(0), GLOBE(0), SHIELD(0), RESET(0), INFO(0), PLUS(0)
+    CONTRAST(0), GLOBE(0), SHIELD(0), RESET(0), INFO(0), PLUS(0), SEARCH(0), CHECK(0)
 }
 
 /**
@@ -244,6 +244,11 @@ class GlyphIcon(
                 c.drawArc(RectF(4f, 4f, 20f, 20f), -60f, 300f, false, stroke)
                 poly(c, 16f, 2.5f, 16f, 6.5f, 20f, 6.5f)
             }
+            Glyph.SEARCH -> {
+                c.drawCircle(10.5f, 10.5f, 6.5f, stroke)
+                c.drawLine(15.5f, 15.5f, 20.5f, 20.5f, stroke)
+            }
+            Glyph.CHECK -> poly(c, 5f, 12.5f, 10f, 17.5f, 19f, 7f)
             Glyph.INFO -> {
                 c.drawCircle(12f, 12f, 8.5f, stroke)
                 c.drawLine(12f, 11f, 12f, 16.5f, stroke); c.drawCircle(12f, 7.8f, 1.2f, fill)

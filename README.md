@@ -1,35 +1,37 @@
 # Clean
 
-A minimal home screen for Samsung phones (and other Android phones from Android 8 on).
-Fewer apps, less scrolling, just what you need.
+A calm, white home screen for Samsung phones (and every Android phone from Android 8 on).
+Less phone, more life.
 
-- Clean home screen with clock, date, steps, and weather
-- Real app logos, no text
-- Built-in backgrounds or your own photo
-- **App Store** with useful apps only (WhatsApp, Spotify, Gmail, DB Navigator, banking …), no feeds, no games
-- **QR scanner**: web pages open only through a QR code or a link, and YouTube, TikTok, Instagram & co. are always blocked
-- Weather, step counter, flashlight
-- **Reset to Samsung** at any time
+- Clean home screen: large clock, date, steps, weather
+- Real app logos in soft white tiles, no text clutter
+- Smooth animations, its own font, light by default (dark optional)
+- **App Store with search**: only useful apps (WhatsApp, Spotify, Gmail, DB Navigator, banking …), no feeds, no games
+- **App lock**: YouTube, TikTok & co. stay installed but won't open
+- **Notification filter**: only calls, SMS, alarms, and your Clean apps get through
+- **QR scanner**: web pages open only through a QR code or a link, and blocked sites stay blocked
+- Weather, step counter, flashlight, backgrounds
+- **Reset to Samsung** at any time: everything is exactly as before, including logins
 
 ## Install directly on your phone
 
 1. Open this link on your Samsung:
    **https://github.com/nikoatonchev-debug/clean-phone/releases/latest/download/Clean.apk**
 2. Tap the downloaded file **Clean.apk**.
-3. If the phone asks: tap **Settings**, then turn on **Allow from this source**, then go back.
+3. If the phone asks: tap **Settings**, turn on **Allow from this source**, then go back.
 4. Tap **Install**, then **Open**.
-5. On the home screen, tap **Set as home screen** and choose **Clean**.
+5. Clean greets you and guides you through four short steps.
 
-## Full lock of the other apps (optional, needs a PC)
+**If a switch is gray during setup** ("Restricted setting"):
+open **Settings → Apps → Clean**, tap **⋮** at the top right, then **Allow restricted settings**. Then try again.
 
-With the full lock, YouTube, Chrome & co. are not just hidden but genuinely locked.
-Android allows this only over a USB cable:
+## Even simpler with a PC (optional)
 
-1. On the phone: **Settings → About phone → Software information** → tap **Build number** 7 times.
-2. **Settings → Developer options** → turn on **USB debugging**.
-3. **Settings → Accounts and backup → Manage accounts** → remove every account for now (you can sign back in afterwards).
-4. Download this repo on your PC (**Code → Download ZIP**), unpack it, and double-click **Einrichten.bat**.
+Turn on USB debugging on the phone (**Settings → About phone → Software information** → tap **Build number** 7 times →
+**Developer options → USB debugging**), plug the phone into the PC, and double-click **Einrichten.bat**.
+Clean then switches everything on by itself.
 
-## Back to normal Samsung
+## Your data stays
 
-**Clean → Settings → Reset to Samsung**. Every app comes back, and your photos, contacts, and chats stay.
+Clean doesn't delete or change any app. Locked apps stay installed with all their data and logins.
+**Clean → Settings → Reset to Samsung** removes Clean, and your phone is exactly as it was before.

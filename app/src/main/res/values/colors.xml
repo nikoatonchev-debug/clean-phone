@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="clean_bg">#0B1220</color>
-    <color name="icon_bg">#14213D</color>
+    <color name="clean_bg">#FFFFFF</color>
+    <color name="icon_bg">#F5F5F4</color>
 </resources>

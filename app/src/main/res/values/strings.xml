@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="guard_description">Clean schickt dich zur Startseite zurück, wenn eine App aufgeht, die nicht zu Clean gehört. Clean liest dabei keine Inhalte, nur welche App gerade geöffnet wird.</string>
+</resources>

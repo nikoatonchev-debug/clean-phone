@@ -42,7 +42,7 @@ object Catalog {
 
         StoreApp("com.paypal.android.p2pmobile", "PayPal", "Bezahlen und Geld senden", "Geld"),
         StoreApp("com.starfinanz.smob.android.sfinanzstatus", "Sparkasse", "Online-Banking", "Geld"),
-        StoreApp("de.fiducia.smartphone.android.banking.vr", "VR Banking", "Volksbanken Raiffeisenbanken", "Geld", search = "VR Banking"),
+        StoreApp("de.fiduciagad.banking.vr", "VR Banking", "Volksbanken Raiffeisenbanken", "Geld"),
         StoreApp("de.number26.android", "N26", "Online-Banking", "Geld"),
         StoreApp("com.google.android.apps.walletnfcrel", "Google Wallet", "Mit dem Handy bezahlen", "Geld"),
 
@@ -55,7 +55,7 @@ object Catalog {
         StoreApp("com.google.android.apps.translate", "Google Übersetzer", "Texte und Gespräche übersetzen", "Alltag"),
         StoreApp("com.lidl.eci.lidlplus", "Lidl Plus", "Coupons und Kassenbons", "Alltag"),
 
-        StoreApp("com.doctolib.android", "Doctolib", "Arzttermine buchen", "Gesundheit und Behörden"),
+        StoreApp("fr.doctolib.www", "Doctolib", "Arzttermine buchen", "Gesundheit und Behörden"),
         StoreApp("com.governikus.ausweisapp2", "AusweisApp", "Online-Ausweis", "Gesundheit und Behörden"),
         StoreApp("de.materna.bbk.mobile.app", "NINA", "Warnungen bei Unwetter und Gefahr", "Gesundheit und Behörden"),
 

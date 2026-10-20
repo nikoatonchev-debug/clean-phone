@@ -44,6 +44,11 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".WelcomeActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            tools:ignore="DiscouragedApi,LockedOrientationActivity" />
         <activity android:name=".StepsActivity" android:exported="false" />
         <activity android:name=".WeatherActivity" android:exported="false" />
         <activity android:name=".StoreActivity" android:exported="false" />
@@ -68,6 +73,29 @@
                 <data android:scheme="https" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".NotifyFilter"
+            android:exported="true"
+            android:label="Clean – Mitteilungen filtern"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".AppGuard"
+            android:exported="true"
+            android:label="Clean – Apps sperren"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/app_guard" />
+        </service>
 
         <receiver
             android:name=".AdminReceiver"

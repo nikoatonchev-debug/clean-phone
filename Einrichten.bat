@@ -49,23 +49,24 @@ if errorlevel 1 (
   goto ende
 )
 
-rem Erlaubt den Schwarz-Weiss-Schalter in den Einstellungen.
+rem Damit schaltet Clean App-Sperre, Mitteilungsfilter und Graustufen selbst ein.
 "%ADB%" shell pm grant %PKG% android.permission.WRITE_SECURE_SETTINGS >nul 2>&1
 
 rem Clean als Startbildschirm festlegen.
 "%ADB%" shell cmd package set-home-activity %PKG%/.HomeActivity >nul 2>&1
 
 echo.
-echo  ----------------------------------------------
-echo   Volle Sperre der anderen Apps einrichten?
-echo  ----------------------------------------------
-echo   Dafuer muessen auf dem Handy vorher ALLE Konten
-echo   abgemeldet sein: Einstellungen - Konten und Sicherung
-echo   - Konten verwalten - jedes Konto entfernen.
-echo   (Google, Samsung, WhatsApp-Konto usw. Danach kannst
-echo   du dich wieder anmelden.)
+echo  Clean ist eingerichtet: Startbildschirm, App-Sperre und
+echo  Mitteilungsfilter sind an. Deine Apps und Daten bleiben unveraendert.
 echo.
-set /p VOLL= Jetzt einrichten? (j/n):
+echo  ----------------------------------------------
+echo   Optional: EXTRA starke Sperre (nur fuer Profis)
+echo  ----------------------------------------------
+echo   Versteckt andere Apps komplett. Dafuer muessen vorher ALLE
+echo   Konten am Handy abgemeldet werden (Google, Samsung ...).
+echo   Fuer die meisten reicht die normale Sperre - also einfach n.
+echo.
+set /p VOLL= Extra starke Sperre einrichten? (j/n): 
 if /i not "%VOLL%"=="j" goto start
 
 "%ADB%" shell dpm set-device-owner %PKG%/.AdminReceiver > "%TEMP%\clean_dpm.txt" 2>&1

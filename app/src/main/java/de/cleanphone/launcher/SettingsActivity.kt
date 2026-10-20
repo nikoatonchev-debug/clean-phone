@@ -20,7 +20,7 @@ class SettingsActivity : ScreenActivity() {
         val p = prefs()
 
         section("Aussehen")
-        row("Hintergrundbild", Glyph.PHOTO, p.getString("wallpaper", "Nacht")) {
+        row("Hintergrundbild", Glyph.PHOTO, p.getString("wallpaper", "Weiß")) {
             startActivity(Intent(this, WallpaperActivity::class.java))
         }
         row("Design", Glyph.MOON, if (pal.dark) "Dunkel" else "Hell") {
@@ -29,9 +29,10 @@ class SettingsActivity : ScreenActivity() {
         }
         row("Logos", Glyph.GRID, if (p.getBoolean("mono", false)) "Schwarz-Weiß" else "Original") {
             p.edit().putBoolean("mono", !p.getBoolean("mono", false)).apply()
+            HomeActivity.dirty = true
             render()
         }
-        row("Ganzer Bildschirm schwarz-weiß", Glyph.CONTRAST, if (Lockdown.isGrayscale(this)) "An" else "Aus") {
+        row("Graustufen", Glyph.CONTRAST, if (Lockdown.isGrayscale(this)) "An" else "Aus") {
             if (Lockdown.canGrayscale(this)) {
                 Lockdown.setGrayscale(this, !Lockdown.isGrayscale(this))
                 render()
@@ -63,18 +64,32 @@ class SettingsActivity : ScreenActivity() {
         row("Gesperrte Internetseiten", Glyph.GLOBE, "${Blocklist.defaults.size + Blocklist.custom(this).size}") {
             startActivity(Intent(this, BlockedSitesActivity::class.java))
         }
-        val owner = Lockdown.isOwner(this)
-        row("Andere Apps sperren", Glyph.SHIELD, if (owner) "Aktiv" else "Nicht eingerichtet") {
-            val msg = if (owner)
-                "Die volle Sperre ist aktiv. ${Lockdown.hiddenCount(this)} Apps sind versteckt und gesperrt. Sie sind nicht gelöscht und kommen beim Zurücksetzen wieder."
-            else
-                "Die volle Sperre ist noch nicht eingerichtet. Andere Apps sind darum nur auf der Startseite ausgeblendet, aber nicht gesperrt.\n\nZum Einrichten das Handy per USB-Kabel an den PC anschließen und „Einrichten.bat“ starten."
-            AlertDialog.Builder(this).setTitle("Andere Apps sperren").setMessage(msg)
-                .setPositiveButton("OK", null).show()
+        val p2 = prefs()
+        row("Fremde Mitteilungen blockieren", Glyph.BELL,
+            if (!Guard.notifyEnabled(this)) "Einrichten" else if (p2.getBoolean("notify_filter", true)) "An" else "Aus") {
+            if (!Guard.notifyEnabled(this)) startActivity(Intent(this, WelcomeActivity::class.java).putExtra("setup", true))
+            else { p2.edit().putBoolean("notify_filter", !p2.getBoolean("notify_filter", true)).apply(); Guard.invalidate(); render() }
         }
+        val owner = Lockdown.isOwner(this)
+        val guard = Guard.appGuardEnabled(this)
+        row("Andere Apps sperren", Glyph.SHIELD, when {
+            owner -> "Stark"
+            !guard -> "Einrichten"
+            p2.getBoolean("guard_on", true) -> "An"
+            else -> "Aus"
+        }) {
+            when {
+                owner -> AlertDialog.Builder(this).setTitle("Starke Sperre")
+                    .setMessage("Die starke Sperre ist aktiv. ${Lockdown.hiddenCount(this)} Apps sind versteckt. Sie sind nicht gelöscht, alle Daten und Anmeldungen bleiben, und beim Zurücksetzen kommen sie wieder.")
+                    .setPositiveButton("OK", null).show()
+                !guard -> startActivity(Intent(this, WelcomeActivity::class.java).putExtra("setup", true))
+                else -> { p2.edit().putBoolean("guard_on", !p2.getBoolean("guard_on", true)).apply(); Guard.invalidate(); render() }
+            }
+        }
+        note("Gesperrte Apps bleiben auf dem Handy – mit allen Daten und Anmeldungen. Nach dem Zurücksetzen ist alles wie vorher.")
 
         section("Über")
-        row("Clean 1.0", Glyph.INFO, "Version") {}
+        row("Clean", Glyph.INFO, "Version 2.0", chevron = false) {}
 
         section(" ")
         row("Auf Samsung zurücksetzen", Glyph.RESET, color = pal.danger) { confirmReset() }

@@ -18,10 +18,16 @@ class CleanApp : Application() {
     override fun onCreate() {
         super.onCreate()
         // Apps installed while we run get hidden right away if they are not allowed.
-        val filter = IntentFilter(Intent.ACTION_PACKAGE_ADDED).apply { addDataScheme("package") }
+        val filter = IntentFilter(Intent.ACTION_PACKAGE_ADDED).apply {
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addAction(Intent.ACTION_PACKAGE_CHANGED)
+            addDataScheme("package")
+        }
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(c: Context, i: Intent) {
-                Lockdown.sweep(c)
+                HomeActivity.dirty = true
+                Guard.invalidate()
+                if (i.action == Intent.ACTION_PACKAGE_ADDED) Lockdown.sweep(c)
             }
         }
         if (android.os.Build.VERSION.SDK_INT >= 33) registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
